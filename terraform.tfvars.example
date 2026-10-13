@@ -1,0 +1,27 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit real credentials.
+
+cloudflare_api_token = "replace-with-your-cloudflare-api-token"
+cloudflare_zone_id    = "replace-with-your-cloudflare-zone-id"
+cloudflare_account_id = "replace-with-your-cloudflare-account-id"
+
+# Optional: Cloudflare Zero Trust Identity Provider ID
+# (leave empty to skip automated Access application setup)
+cloudflare_identity_provider_id = ""
+
+tunnels = {
+  homelab = {
+    name   = "homelab-tunnel"
+    domain = "example.com"
+    routes = [
+      {
+        hostname = "app.example.com"
+        service  = "http://app:8080"
+      },
+      {
+        hostname = "media.example.com"
+        service  = "http://media:8096"
+      }
+    ]
+  }
+}
