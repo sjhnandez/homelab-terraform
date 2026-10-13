@@ -1,5 +1,7 @@
 # Cloudflare Tunnels - Terraform Configuration
 
+[![CI](https://github.com/sjhnandez/homelab-terraform/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sjhnandez/homelab-terraform/actions/workflows/ci.yml)
+
 This Terraform configuration manages Cloudflare Zero Trust tunnels (cloudflared) for the network stack.
 
 ## Overview
