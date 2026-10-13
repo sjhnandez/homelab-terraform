@@ -14,7 +14,7 @@ This guide explains how to protect admin services with Cloudflare Zero Trust Acc
 
 ## What access.tf Creates
 
-When `cloudflare_identity_provider_id` is set, Terraform creates **one Access application per admin service**:
+When `cloudflare_identity_provider_id` is set, Terraform creates **one Access application per route marked `access = true` in `terraform.tfvars`**:
 
 | Application | Domain | Policy |
 |-------------|--------|--------|
@@ -34,7 +34,7 @@ Each application is configured as:
 
 > **v5 note**: With provider v5, the policy is defined inline inside the `cloudflare_zero_trust_access_application` resource. There is no separate policy resource to manage.
 
-The protected services are the `admin_services` local at the top of [access.tf](access.tf). Add or remove entries there to change what Access protects.
+The protected services are derived in [access.tf](access.tf) from the `tunnels` variable: every route marked `access = true` in your gitignored `terraform.tfvars` becomes an Access application (see [terraform.tfvars.example](terraform.tfvars.example) for the format). Add or remove the marker on a route to change what Access protects.
 
 ## Enabling Automated Access
 
@@ -61,7 +61,7 @@ cloudflare_identity_provider_id = "google-oauth2"  # Or your provider ID
 ```bash
 cd homelab-terraform
 terraform init     # Installs the pinned Cloudflare provider
-terraform plan     # Should show 6 Access applications to be created
+terraform plan     # Should show one Access application per route marked access = true
 terraform apply    # Creates the Access applications and their policies
 ```
 
@@ -89,7 +89,7 @@ To change the duration, edit `session_duration` in [access.tf](access.tf) and ru
 
 - **Not using Access yet?** Leave `cloudflare_identity_provider_id = ""` - no Access resources are created.
 - **Turn it off later**: Set `cloudflare_identity_provider_id = ""` and run `terraform apply`.
-- **Protect fewer services**: Remove entries from `local.admin_services` in [access.tf](access.tf) and apply.
+- **Protect fewer services**: Remove the `access = true` marker from the route in `terraform.tfvars` and apply.
 
 ⚠️ **Security Warning**: After disabling Access, anyone who can reach those hostnames can access the admin services!
 
@@ -133,5 +133,5 @@ terraform validate  # Should pass now
 - **[main.tf](main.tf)** - Provider configuration (cloudflare v5.24+)
 - **[access.tf](access.tf)** - Access applications and inline policies
 - **[variables.tf](variables.tf)** - `cloudflare_identity_provider_id` variable defined
-- **[terraform.tfvars](terraform.tfvars)** - Set your identity_provider_id here
+- **[terraform.tfvars](terraform.tfvars)** - Set your identity_provider_id and `access = true` route markers here
 - **[ACCESS_SETUP.md](ACCESS_SETUP.md)** - Manual setup guide (alternative to Terraform)

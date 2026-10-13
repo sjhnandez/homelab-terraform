@@ -1,7 +1,7 @@
 # Copy this file to terraform.tfvars and fill in real values.
 # terraform.tfvars is gitignored — never commit real credentials.
 
-cloudflare_api_token = "replace-with-your-cloudflare-api-token"
+cloudflare_api_token  = "replace-with-your-cloudflare-api-token"
 cloudflare_zone_id    = "replace-with-your-cloudflare-zone-id"
 cloudflare_account_id = "replace-with-your-cloudflare-account-id"
 
@@ -9,18 +9,80 @@ cloudflare_account_id = "replace-with-your-cloudflare-account-id"
 # (leave empty to skip automated Access application setup)
 cloudflare_identity_provider_id = ""
 
+# Routes marked `access = true` become Zero Trust Access applications (see `access.tf`).
 tunnels = {
-  homelab = {
-    name   = "homelab-tunnel"
+  apps = {
+    name   = "apps-tunnel"
     domain = "example.com"
     routes = [
       {
-        hostname = "app.example.com"
-        service  = "http://app:8080"
+        hostname = "chat.example.com"
+        service  = "http://open-webui:8080"
       },
       {
-        hostname = "media.example.com"
-        service  = "http://media:8096"
+        hostname = "portal.example.com"
+        service  = "http://apps-portal:80"
+      },
+      {
+        hostname = "profile.example.com"
+        service  = "http://apps-profile:80"
+      },
+      {
+        hostname = "lab.example.com"
+        service  = "http://lab-api:8000"
+      }
+    ]
+  }
+
+  media = {
+    name   = "media-tunnel"
+    domain = "example.com"
+    routes = [
+      {
+        hostname = "jellyfin.example.com"
+        service  = "http://jellyfin:8096"
+      },
+      {
+        hostname = "radarr.example.com"
+        service  = "http://radarr:7878"
+        access   = true
+      },
+      {
+        hostname = "sonarr.example.com"
+        service  = "http://sonarr:8989"
+        access   = true
+      },
+      {
+        hostname = "prowlarr.example.com"
+        service  = "http://prowlarr:9696"
+        access   = true
+      },
+      {
+        hostname = "sabnzbd.example.com"
+        service  = "http://sabnzbd:8080"
+        access   = true
+      },
+      {
+        hostname = "jellyseerr.example.com"
+        service  = "http://jellyseerr:5055"
+      },
+      {
+        hostname = "request.example.com"
+        service  = "http://jellyseerr:5055"
+      },
+      {
+        hostname = "homarr.example.com"
+        service  = "http://homarr:7575"
+        access   = true
+      },
+      {
+        hostname = "bazarr.example.com"
+        service  = "http://bazarr:6767"
+        access   = true
+      },
+      {
+        hostname = "join.example.com"
+        service  = "http://wizarr:5690"
       }
     ]
   }
