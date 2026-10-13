@@ -13,7 +13,7 @@
 #    - tunnels configuration
 
 # 3. Deploy
-cd terraform
+cd homelab-terraform
 terraform init
 terraform apply
 ```

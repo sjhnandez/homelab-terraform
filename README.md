@@ -57,7 +57,7 @@ tunnels = {
 ### 3. Initialize & Deploy
 
 ```bash
-cd terraform
+cd homelab-terraform
 terraform init
 terraform plan          # Review changes
 terraform apply         # Apply configuration

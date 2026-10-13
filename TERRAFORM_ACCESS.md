@@ -1,60 +1,73 @@
-# Cloudflare Access Automation - Two Approaches
+# Cloudflare Zero Trust Access - Automated Setup (Terraform)
 
-## TL;DR
+This guide explains how to protect admin services with Cloudflare Zero Trust Access using Terraform. The Access resources live in [access.tf](access.tf) and use the Cloudflare provider v5.24+ (`cloudflare_zero_trust_access_*` resources).
 
-**Yes, Terraform can automate Access creation**, but requires a provider version change.
+> **Prefer the dashboard?** See [ACCESS_SETUP.md](ACCESS_SETUP.md) for the manual walkthrough instead. Both approaches produce the same result.
 
-- ✅ **Current state**: access.tf is ready for v4.20+ provider
-- ⚙️ **Your current provider**: v5.24 (doesn't have Access resources)
-- 🔄 **To enable**: Change provider to v4.20+ and provide identity_provider_id
+## Overview
 
----
+- **Protected Services** (require login): media-app-1, media-app-2, media-app-3, media-app-4, media-app-5, homarr
+- **Open Services** (no login): jellyfin, media-app-6, join/media-app-7
+- **Authentication**: Cloudflare Access with an OAuth identity provider (Google, Microsoft, GitHub, etc.)
+- **Session duration**: 24 hours
+- **Setup time**: ~5 minutes once an identity provider exists
 
-## Approach 1: Full Terraform Automation (Recommended)
+## What access.tf Creates
 
-### Prerequisites
+When `cloudflare_identity_provider_id` is set, Terraform creates **one Access application per admin service**:
 
-1. **Update Terraform Provider Version**
+| Application | Domain | Policy |
+|-------------|--------|--------|
+| media-app-1 | `media-app-1.example.com` | Allow Cloudflare Account Members |
+| media-app-2 | `media-app-2.example.com` | Allow Cloudflare Account Members |
+| media-app-3 | `media-app-3.example.com` | Allow Cloudflare Account Members |
+| media-app-4 | `media-app-4.example.com` | Allow Cloudflare Account Members |
+| media-app-5 | `media-app-5.example.com` | Allow Cloudflare Account Members |
+| homarr | `homarr.example.com` | Allow Cloudflare Account Members |
 
-   Edit [main.tf](main.tf):
-   ```hcl
-   version = "~> 4.20"  # Change from "~> 5.24"
-   ```
+Each application is configured as:
 
-   This downgrade is **safe** - v4.20 still supports all tunnel functionality plus Access.
+- **Type**: self-hosted
+- **Session duration**: 24 hours
+- **Auto redirect**: enabled - visitors go straight to your identity provider's login instead of the Access launcher
+- **Policy**: an inline `allow` policy that includes anyone who authenticates through your identity provider (`login_method`)
 
-2. **Set Identity Provider ID**
+> **v5 note**: With provider v5, the policy is defined inline inside the `cloudflare_zero_trust_access_application` resource. There is no separate policy resource to manage.
 
-   Edit [terraform.tfvars](terraform.tfvars):
-   ```hcl
-   cloudflare_identity_provider_id = "google-oauth2"  # Or your provider ID
-   ```
+The protected services are the `admin_services` local at the top of [access.tf](access.tf). Add or remove entries there to change what Access protects.
 
-   How to get your ID:
-   - Go: https://one.dash.cloudflare.com/access/settings/authentication
-   - Click **Add new** and enable a provider (Google, Microsoft, GitHub, etc.)
-   - The ID will appear (e.g., `google-oauth2` or `507f1f77bcf86cd799439011`)
-   - Copy it to terraform.tfvars
+## Enabling Automated Access
 
-3. **Apply Terraform**
+If `cloudflare_identity_provider_id` is left empty (the default), no Access resources are created - your tunnels and DNS still apply normally.
 
-   ```bash
-   cd /home/server/stacks/network/terraform
-   terraform init     # Downloads provider v4.20
-   terraform plan     # Shows Access applications to be created
-   terraform apply    # Creates 6 Access applications + policies
-   ```
+### Step 1: Create an Identity Provider
 
-4. **What Gets Created**
+1. Open [Cloudflare Zero Trust](https://one.dash.cloudflare.com)
+2. Go: **Settings → Authentication**
+3. Under "Login Methods", click **Add new**
+4. Choose a provider (Google, Microsoft Azure AD, GitHub, or One-time PIN)
+5. Once active, copy the **identity provider ID** (e.g. `google-oauth2` or a numeric ID like `507f1f77bcf86cd799439011`)
 
-   - 6 Access Applications (one per admin service)
-   - 1 Policy per application (allow authenticated users)
-   - Automatically configured for your OAuth provider
-   - All services protected with 24-hour session duration
+### Step 2: Set the Identity Provider ID
 
-### Verification
+Edit your `terraform.tfvars`:
 
-After applying:
+```hcl
+cloudflare_identity_provider_id = "google-oauth2"  # Or your provider ID
+```
+
+### Step 3: Apply
+
+```bash
+cd homelab-terraform
+terraform init     # Installs the pinned Cloudflare provider
+terraform plan     # Should show 6 Access applications to be created
+terraform apply    # Creates the Access applications and their policies
+```
+
+The provider version is pinned in [main.tf](main.tf) and recorded in the committed `.terraform.lock.hcl`, so `terraform init` always installs the same provider build.
+
+### Step 4: Verify
 
 ```bash
 # See created applications:
@@ -65,121 +78,60 @@ terraform output access_applications
 # https://jellyfin.example.com → Loads immediately (not protected)
 ```
 
-### Advantages
+## Session Management
 
-✅ Infrastructure-as-Code (reproducible, version controlled)
-✅ Fully automated (no manual steps in Cloudflare UI)
-✅ Easy to modify (adjust session duration, add users, etc.)
-✅ Portable (can redeploy everything with one command)
-✅ Audit trail (git history shows all changes)
+- **Default duration**: 24 hours (set via `session_duration` in [access.tf](access.tf))
+- **After timeout**: You'll be redirected to login again
 
----
+To change the duration, edit `session_duration` in [access.tf](access.tf) and run `terraform apply`.
 
-## Approach 2: Manual Setup (Current State)
+## Removing or Disabling Access
 
-If you prefer **not** to change the provider version:
+- **Not using Access yet?** Leave `cloudflare_identity_provider_id = ""` - no Access resources are created.
+- **Turn it off later**: Set `cloudflare_identity_provider_id = ""` and run `terraform apply`.
+- **Protect fewer services**: Remove entries from `local.admin_services` in [access.tf](access.tf) and apply.
 
-1. Don't update main.tf (keep v5.24)
-2. Leave `cloudflare_identity_provider_id = ""` in terraform.tfvars
-3. Follow [ACCESS_SETUP.md](ACCESS_SETUP.md) for manual Cloudflare UI steps
-4. Takes ~5-10 minutes, no Terraform changes needed
-
-### Advantages
-
-✅ No provider version change required
-✅ Simpler if you prefer UI-based setup
-✅ Good for one-time configuration
-
-### Disadvantages
-
-❌ Not infrastructure-as-code
-❌ Manual steps to repeat if needed
-❌ Harder to track changes
-❌ Not portable to other systems
-
----
-
-## Recommendation
-
-**Use Approach 1** (provider v4.20 + Terraform automation) because:
-
-1. **v4.20 is stable** - it's an older but well-tested version
-2. **Your tunnels continue working** - tunnel resources are compatible
-3. **Full automation** - git tracks all your security configuration
-4. **Future flexibility** - easy to add users, change policies, etc.
-5. **Only 3 steps**: Update provider → Set identity ID → Apply
-
----
-
-## Migration Path
-
-If you're currently on v5.24 with other resources:
-
-```bash
-# 1. Update main.tf version to v4.20
-# 2. Run terraform plan (should show no changes if only using tunnels)
-# 3. Add access.tf resources (already created)
-# 4. Run terraform apply (creates Access policies)
-```
-
-**Safe**: Downgrading to v4.20 won't affect your tunnel configuration - they're compatible.
-
----
+⚠️ **Security Warning**: After disabling Access, anyone who can reach those hostnames can access the admin services!
 
 ## Troubleshooting
 
-### "terraform validate" fails with Access resources
+### No Access applications are created
 
-**Cause**: Provider is still v5.24
-**Fix**: 
+**Cause**: `cloudflare_identity_provider_id` is empty in terraform.tfvars
+**Fix**:
+1. Create an identity provider at **Settings → Authentication** in the Zero Trust dashboard
+2. Copy its ID into `cloudflare_identity_provider_id`
+3. Run `terraform apply`
+
+### Login page fails or shows "Access Denied"
+
+**Cause**: The identity provider ID doesn't match an active provider, or you're not signed in with an allowed account
+**Fix**:
+1. Verify the provider shows "Active" at **Settings → Authentication**
+2. Copy the exact ID and update terraform.tfvars
+3. Sign in with an account from that provider
+
+### "terraform validate" fails
+
+**Cause**: Provider plugins are not installed
+**Fix**:
 ```bash
-cd /home/server/stacks/network/terraform
-rm .terraform.lock.hcl     # Force provider update
-terraform init             # Downloads v4.20
-terraform validate         # Should pass now
+cd homelab-terraform
+terraform init      # Installs the pinned Cloudflare provider
+terraform validate  # Should pass now
 ```
 
-### "identity_provider_id is empty"
+### `terraform output access_applications` is empty
 
-**Cause**: You haven't set it in terraform.tfvars
+**Cause**: Access resources haven't been applied (identity provider ID still empty)
 **Fix**:
-1. Go: https://one.dash.cloudflare.com/access/settings/authentication
-2. Add a provider (click "Add new")
-3. Copy the ID
-4. Update terraform.tfvars
-5. Run `terraform apply`
-
-### Access applications show "No policy configured"
-
-**Cause**: Policy wasn't created
-**Fix**:
-1. Check terraform output: `terraform output access_applications`
-2. Run `terraform plan` to see what should exist
-3. Run `terraform apply` to sync
-
----
-
-## Next Steps
-
-Choose your approach:
-
-**Option A: Full Terraform (Recommended)**
-1. Edit main.tf: Change version to "~> 4.20"
-2. Edit terraform.tfvars: Add your identity_provider_id
-3. Run: `terraform apply`
-4. Done! Access applications created automatically
-
-**Option B: Manual Setup**
-1. Keep terraform.tfvars with empty identity_provider_id
-2. Follow ACCESS_SETUP.md for manual steps
-3. No Terraform changes needed
-
----
+1. Set `cloudflare_identity_provider_id` and run `terraform apply`
+2. Run `terraform output access_applications` again
 
 ## Files Involved
 
-- **[main.tf](main.tf)** - Update provider version here (Approach 1)
-- **[access.tf](access.tf)** - Access resource definitions (ready to use)
-- **[variables.tf](variables.tf)** - identity_provider_id variable defined
+- **[main.tf](main.tf)** - Provider configuration (cloudflare v5.24+)
+- **[access.tf](access.tf)** - Access applications and inline policies
+- **[variables.tf](variables.tf)** - `cloudflare_identity_provider_id` variable defined
 - **[terraform.tfvars](terraform.tfvars)** - Set your identity_provider_id here
-- **[ACCESS_SETUP.md](ACCESS_SETUP.md)** - Manual setup guide (Approach 2)
+- **[ACCESS_SETUP.md](ACCESS_SETUP.md)** - Manual setup guide (alternative to Terraform)
