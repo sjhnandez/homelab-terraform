@@ -3,14 +3,17 @@
 # In v5, application-scoped policies are defined inline in the application resource
 
 locals {
-  admin_services = {
-    "media-app-1.example.com" = "media-app-1"
-    "media-app-2.example.com" = "media-app-2"
-    "media-app-3.example.com" = "media-app-3"
-    "media-app-4.example.com" = "media-app-4"
-    "media-app-5.example.com" = "media-app-5"
-    "homarr.example.com"      = "homarr"
-  }
+  # Derive Access-protected services from var.tunnels (defined in the
+  # gitignored terraform.tfvars), mirroring the for_each pattern in tunnels.tf.
+  # Any route marked `access = true` gets a Zero Trust Access application.
+  # Map key = route hostname (matches the live for_each instance keys),
+  # map value = application name (first DNS label of the hostname).
+  admin_services = merge([
+    for tunnel in values(var.tunnels) : {
+      for route in tunnel.routes : route.hostname => split(".", route.hostname)[0]
+      if route.access
+    }
+  ]...)
 }
 
 # Create Zero Trust Access Application for each admin service
@@ -47,7 +50,7 @@ resource "cloudflare_zero_trust_access_application" "admin" {
 output "access_applications" {
   description = "Created Zero Trust Access Applications"
   value = var.cloudflare_identity_provider_id != "" ? {
-    for name, app in cloudflare_zero_trust_access_application.admin : name => {
+    for hostname, app in cloudflare_zero_trust_access_application.admin : hostname => {
       name   = app.name
       domain = app.domain
       url    = "https://${app.domain}"

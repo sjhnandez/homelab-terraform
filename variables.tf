@@ -26,6 +26,7 @@ variable "tunnels" {
       path           = optional(string)
       service        = string
       origin_request = optional(map(any))
+      access         = optional(bool, false)
     }))
   }))
   default = {}
